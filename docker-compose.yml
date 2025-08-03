@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  # Qdrant Vector Database
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: devbuddy-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    networks:
+      - devbuddy-network
+
+  # Backend Service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: devbuddy-backend
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - QDRANT_URL=${QDRANT_URL:-http://qdrant:6333}
+      - QDRANT_API_KEY=${QDRANT_API_KEY}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
+      - EMBEDDING_DIMENSION=${EMBEDDING_DIMENSION:-1536}
+      - TEMP_REPO_DIR=${TEMP_REPO_DIR:-/tmp/repos}
+    volumes:
+      - /tmp/repos:/tmp/repos
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - qdrant
+    networks:
+      - devbuddy-network
+    restart: unless-stopped
+
+  # Frontend Service
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: devbuddy-frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      - NEXT_PUBLIC_BACKEND_URL=${NEXT_PUBLIC_BACKEND_URL:-http://localhost:8000}
+    depends_on:
+      - backend
+    networks:
+      - devbuddy-network
+    restart: unless-stopped
+
+volumes:
+  qdrant_data:
+
+networks:
+  devbuddy-network:
+    driver: bridge
