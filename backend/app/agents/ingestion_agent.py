@@ -1,55 +1,41 @@
-# D:\DevBuddy\backend\app\services\embedding_service.py
+# D:\DevBuddy\backend\app\agents\ingestion_agent.py
 
 import os
 from typing import List, Dict, Any
 from loguru import logger
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from langchain.embeddings.base import Embeddings
+from app.utils.git_utils import GitUtils
+from app.utils.ast_utils import ASTChunker
+from app.services.embedding_service import EmbeddingService
+from app.services.qdrant_service import QdrantService
 
-class EmbeddingService:
-    def __init__(self):
-        """
-        Initializes the embedding service with a Gemini model.
-        The GoogleGenerativeAIEmbeddings class is part of the langchain-google-genai
-        package and requires the GOOGLE_API_KEY environment variable.
-        """
-        try:
-            # Using Gemini's embedding model for text-to-vector conversion
-            # The model name "models/embedding-001" is a standard embedding model
-            # provided by Google.
-            self.embedding_model: Embeddings = GoogleGenerativeAIEmbeddings(
-                model="models/embedding-001"
-            )
-            logger.info("Successfully initialized Gemini embedding model.")
-        except Exception as e:
-            logger.error(f"Failed to initialize Gemini embedding model: {e}")
-            raise RuntimeError("Gemini API key might be missing or invalid.") from e
+class IngestionAgent:
+    def __init__(self, qdrant_service: QdrantService):
+        self.git_utils = GitUtils()
+        self.ast_chunker = ASTChunker()
+        self.embedding_service = EmbeddingService()
+        self.qdrant_service = qdrant_service
 
-    async def embed_code_chunks(self, chunks: List[Dict[str, Any]]) -> List[List[float]]:
-        """
-        Generates embeddings for a list of code chunks using the initialized
-        Gemini embedding model.
-
-        Args:
-            chunks: A list of dictionaries, where each dictionary represents a
-                    code chunk and contains a 'content' key with the code string.
-
-        Returns:
-            A list of lists of floats, where each inner list is the embedding
-            vector for a corresponding code chunk.
-        """
-        if not chunks:
-            return []
-
-        # Extract the content from each chunk to create a list of text strings
-        texts = [chunk['content'] for chunk in chunks]
-        
-        try:
-            logger.info(f"Generating embeddings for {len(texts)} chunks...")
-            # Use the asynchronous aembed_documents method for efficiency
-            embeddings = await self.embedding_model.aembed_documents(texts)
-            logger.info("Embeddings generation complete.")
-            return embeddings
-        except Exception as e:
-            logger.error(f"Failed to generate embeddings: {e}")
-            raise RuntimeError("Embedding generation failed.") from e
+    async def ingest_repo(self, repo_url: str, branch: str = "main", include_patterns=None, exclude_patterns=None) -> Dict[str, Any]:
+        logger.info(f"Ingestion started for {repo_url}")
+        # 1. Clone repo
+        repo_path = await self.git_utils.clone_repository(repo_url, branch=branch, force=True)
+        # 2. Find Python files
+        py_files = self.git_utils.get_python_files(repo_path, include_patterns, exclude_patterns)
+        all_chunks = []
+        for file_path in py_files:
+            code = self.git_utils.get_file_content(file_path)
+            chunks = self.ast_chunker.chunk_code(file_path, code)
+            for chunk in chunks:
+                chunk['repo_url'] = repo_url
+                chunk['file_extension'] = '.py'
+            all_chunks.extend(chunks)
+        # 3. Generate embeddings
+        embeddings = await self.embedding_service.embed_code_chunks(all_chunks)
+        # 4. Store in Qdrant
+        await self.qdrant_service.store_chunks(all_chunks, embeddings)
+        logger.info(f"Ingestion completed for {repo_url}")
+        return {
+            'repo_url': repo_url,
+            'files_processed': len(py_files),
+            'chunks_created': len(all_chunks)
+        }

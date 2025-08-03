@@ -1,83 +1,79 @@
+# D:\DevBuddy\backend\app\services\embedding_service.py
+
 import os
 from typing import List, Dict, Any
-from openai import AsyncOpenAI
-import asyncio
 from loguru import logger
-import tiktoken
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain.embeddings.base import Embeddings
+from tenacity import retry, wait_random_exponential, stop_after_attempt
 
 class EmbeddingService:
     def __init__(self):
-        self.client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        self.model = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
-        self.max_tokens = 8192  # Max tokens for embedding model
-        self.encoding = tiktoken.get_encoding("cl100k_base")
-    
-    def count_tokens(self, text: str) -> int:
-        """Count tokens in text"""
-        return len(self.encoding.encode(text))
-    
-    def truncate_text(self, text: str, max_tokens: int = None) -> str:
-        """Truncate text to fit within token limit"""
-        if max_tokens is None:
-            max_tokens = self.max_tokens
-            
-        tokens = self.encoding.encode(text)
-        if len(tokens) <= max_tokens:
-            return text
-            
-        # Truncate and decode back to text
-        truncated_tokens = tokens[:max_tokens]
-        return self.encoding.decode(truncated_tokens)
-    
-    async def generate_embedding(self, text: str) -> List[float]:
-        """Generate embedding for a single text"""
+        """
+        Initializes the embedding service with a Gemini embedding model.
+        The GoogleGenerativeAIEmbeddings class is part of the langchain-google-genai
+        package and requires the GOOGLE_API_KEY environment variable.
+        """
+        # Ensure the GOOGLE_API_KEY is set
+        api_key = os.getenv("GOOGLE_API_KEY")
+        if not api_key:
+            logger.error("GOOGLE_API_KEY environment variable not set.")
+            raise ValueError("GOOGLE_API_KEY not found. Please set the environment variable.")
+
         try:
-            # Truncate text if too long
-            text = self.truncate_text(text)
-            
-            response = await self.client.embeddings.create(
-                model=self.model,
-                input=text
+            # We are using the LangChain wrapper for Google Generative AI embeddings
+            # This handles the API client creation and embedding generation
+            self.embedding_model: Embeddings = GoogleGenerativeAIEmbeddings(
+                model="models/embedding-001",
+                google_api_key=api_key,
             )
-            
-            return response.data[0].embedding
-            
+            logger.info("Successfully initialized Gemini embedding model.")
         except Exception as e:
-            logger.error(f"Failed to generate embedding: {e}")
-            raise
+            logger.error(f"Failed to initialize Gemini embedding model: {e}")
+            raise RuntimeError("Gemini API key might be missing or invalid.") from e
+
+    # There is no direct equivalent of tiktoken for Gemini models, but the SDK
+    # can handle token counting implicitly. The API has a limit of 2048 tokens per
+    # individual text input. The LangChain wrapper should handle this.
+    # We will remove the `truncate_text` and `count_tokens` methods as they are no
+    # longer needed with the `GoogleGenerativeAIEmbeddings` class.
+
+    @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
+    async def _embed_batch(self, texts: List[str]) -> List[List[float]]:
+        """
+        Generates embeddings for a single batch of texts with retry logic.
+        """
+        return await self.embedding_model.aembed_documents(texts)
     
-    async def generate_embeddings_batch(self, texts: List[str], batch_size: int = 100) -> List[List[float]]:
-        """Generate embeddings for multiple texts in batches"""
+    async def embed_code_chunks(self, chunks: List[Dict[str, Any]]) -> List[List[float]]:
+        """
+        Generates embeddings for a list of code chunks using the initialized
+        Gemini embedding model.
+
+        Args:
+            chunks: A list of dictionaries, where each dictionary represents a
+                    code chunk and contains a 'content' key with the code string.
+
+        Returns:
+            A list of lists of floats, where each inner list is the embedding
+            vector for a corresponding code chunk.
+        """
+        if not chunks:
+            return []
+
+        # The `GoogleGenerativeAIEmbeddings` class handles batching automatically.
+        # We just need to extract the text content from the chunks.
+        texts = [self.prepare_chunk_for_embedding(chunk) for chunk in chunks]
+        
         try:
-            embeddings = []
-            
-            # Process in batches to avoid rate limits
-            for i in range(0, len(texts), batch_size):
-                batch = texts[i:i + batch_size]
-                
-                # Truncate texts in batch
-                batch = [self.truncate_text(text) for text in batch]
-                
-                response = await self.client.embeddings.create(
-                    model=self.model,
-                    input=batch
-                )
-                
-                batch_embeddings = [data.embedding for data in response.data]
-                embeddings.extend(batch_embeddings)
-                
-                # Small delay to respect rate limits
-                if i + batch_size < len(texts):
-                    await asyncio.sleep(0.1)
-                    
-                logger.info(f"Generated embeddings for batch {i//batch_size + 1}/{(len(texts)-1)//batch_size + 1}")
-            
+            logger.info(f"Generating embeddings for {len(texts)} chunks...")
+            embeddings = await self._embed_batch(texts)
+            logger.info("Embeddings generation complete.")
             return embeddings
-            
         except Exception as e:
-            logger.error(f"Failed to generate batch embeddings: {e}")
-            raise
-    
+            logger.error(f"Failed to generate embeddings: {e}")
+            raise RuntimeError("Embedding generation failed.") from e
+
     def prepare_chunk_for_embedding(self, chunk: Dict[str, Any]) -> str:
         """Prepare a code chunk for embedding"""
         parts = []
@@ -88,7 +84,7 @@ class EmbeddingService:
         
         if chunk.get("class_name"):
             parts.append(f"Class: {chunk['class_name']}")
-            
+        
         if chunk.get("function_name"):
             parts.append(f"Function: {chunk['function_name']}")
         
@@ -100,19 +96,3 @@ class EmbeddingService:
         parts.append(f"Code:\n{chunk['content']}")
         
         return "\n\n".join(parts)
-    
-    async def embed_code_chunks(self, chunks: List[Dict[str, Any]]) -> List[List[float]]:
-        """Generate embeddings for code chunks"""
-        try:
-            # Prepare texts for embedding
-            texts = [self.prepare_chunk_for_embedding(chunk) for chunk in chunks]
-            
-            # Generate embeddings
-            embeddings = await self.generate_embeddings_batch(texts)
-            
-            logger.info(f"Generated embeddings for {len(chunks)} code chunks")
-            return embeddings
-            
-        except Exception as e:
-            logger.error(f"Failed to embed code chunks: {e}")
-            raise
