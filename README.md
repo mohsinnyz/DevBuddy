@@ -46,7 +46,6 @@ DevBuddy is a full-stack application that analyzes GitHub repositories using a m
 - API keys for:
   - **Gemini** (AI Studio): https://aistudio.google.com/app/apikey
   - **Groq**: https://console.groq.com/keys
-  - **OpenAI**: https://platform.openai.com/api-keys (for embeddings)
 
 ### Setup
 
@@ -136,7 +135,7 @@ curl -X POST "http://localhost:8000/api/chat" \
 - Clones GitHub repositories
 - Parses Python files using AST
 - Chunks code at function/class level
-- Generates embeddings using OpenAI
+- Generates embeddings using Gemini 1.5-flash
 - Stores vectors in Qdrant
 
 ### Retriever Agent
