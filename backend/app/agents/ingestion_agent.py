@@ -1,5 +1,3 @@
-# D:\DevBuddy\backend\app\agents\ingestion_agent.py
-
 import os
 from typing import List, Dict, Any
 from loguru import logger
@@ -15,27 +13,47 @@ class IngestionAgent:
         self.embedding_service = EmbeddingService()
         self.qdrant_service = qdrant_service
 
-    async def ingest_repo(self, repo_url: str, branch: str = "main", include_patterns=None, exclude_patterns=None) -> Dict[str, Any]:
+    async def ingest_repo(
+        self,
+        repo_url: str,
+        branch: str = "main",
+        include_patterns=None,
+        exclude_patterns=None
+    ) -> Dict[str, Any]:
         logger.info(f"Ingestion started for {repo_url}")
+        
         # 1. Clone repo
-        repo_path = await self.git_utils.clone_repository(repo_url, branch=branch, force=True)
+        repo_path = await self.git_utils.clone_repository(
+            str(repo_url),  # ensure it's a string
+            branch=branch,
+            force=True
+        )
+
         # 2. Find Python files
-        py_files = self.git_utils.get_python_files(repo_path, include_patterns, exclude_patterns)
+        py_files = await self.git_utils.get_python_files(
+            repo_path,
+            include_patterns,
+            exclude_patterns
+        )
+
         all_chunks = []
         for file_path in py_files:
             code = self.git_utils.get_file_content(file_path)
             chunks = self.ast_chunker.chunk_code(file_path, code)
             for chunk in chunks:
-                chunk['repo_url'] = repo_url
+                chunk['repo_url'] = str(repo_url)  # store as string
                 chunk['file_extension'] = '.py'
             all_chunks.extend(chunks)
+
         # 3. Generate embeddings
-        embeddings = await self.embedding_service.embed_code_chunks(all_chunks)
+        embeddings = self.embedding_service.embed_code_chunks(all_chunks)
+
         # 4. Store in Qdrant
-        await self.qdrant_service.store_chunks(all_chunks, embeddings)
+        self.qdrant_service.store_chunks(embeddings, all_chunks)
+
         logger.info(f"Ingestion completed for {repo_url}")
         return {
-            'repo_url': repo_url,
-            'files_processed': len(py_files),
-            'chunks_created': len(all_chunks)
+            "repo_url": str(repo_url),  # ✅ valid dict key-value
+            "files_processed": len(py_files),
+            "chunks_created": len(all_chunks)
         }

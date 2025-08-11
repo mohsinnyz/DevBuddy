@@ -1,6 +1,6 @@
 # DevBuddy - Multi-Agent RAG Chatbot for GitHub Repositories
 
-DevBuddy is a full-stack application that analyzes GitHub repositories using a multi-agent RAG (Retrieval-Augmented Generation) system. Users can paste a GitHub repository link, and the system will clone, parse, and index the code to answer contextual questions about the repository.
+DevBuddy is a full-stack application that analyzes GitHub repositories using a multi-agent RAG (Retrieval-Augmented Generation) system where users can paste a GitHub repository link, and the system will clone, parse, and index the code to answer contextual questions about the repository and project.
 
 ## 🚀 Features
 
@@ -46,7 +46,6 @@ DevBuddy is a full-stack application that analyzes GitHub repositories using a m
 - API keys for:
   - **Gemini** (AI Studio): https://aistudio.google.com/app/apikey
   - **Groq**: https://console.groq.com/keys
-  - **OpenAI**: https://platform.openai.com/api-keys (for embeddings)
 
 ### Setup
 
@@ -199,7 +198,7 @@ npm run dev
 ```
 
 ### Environment Variables
-See `.env.example` for all required environment variables.
+See `.env` for all required environment variables.
 
 ### Testing
 ```bash

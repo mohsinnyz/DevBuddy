@@ -1,3 +1,5 @@
+#D:\DevBuddy\backend\app\main.py
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -22,7 +24,6 @@ async def lifespan(app: FastAPI):
     
     # Initialize Qdrant service
     qdrant_service = QdrantService()
-    await qdrant_service.initialize()
     app.state.qdrant_service = qdrant_service
     
     logger.info("DevBuddy backend started successfully")

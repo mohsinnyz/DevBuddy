@@ -1,6 +1,9 @@
+#D:\DevBuddy\backend\app\models\schemas.py
+
 from pydantic import BaseModel, HttpUrl
 from typing import List, Optional, Dict, Any
 from enum import Enum
+from pydantic import HttpUrl
 
 class IngestionStatus(str, Enum):
     PENDING = "pending"
@@ -21,7 +24,7 @@ class IngestionResponse(BaseModel):
     task_id: str
     status: IngestionStatus
     message: str
-    repo_url: str
+    repo_url: HttpUrl
 
 class IngestionStatusResponse(BaseModel):
     task_id: str
