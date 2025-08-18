@@ -13,63 +13,59 @@ class ModifierAgent:
         if not api_key:
             raise ValueError("GROQ_API_KEY environment variable is required")
 
-        # ✅ Updated model from deprecated Mixtral to LLaMA 3
+        # ✅ Updated to stable LLaMA 3 model
         self.llm = ChatGroq(
             api_key=api_key,
-            model="llama3-8b-8192",  # new stable Groq model
+            model="llama3-8b-8192",
             temperature=0.1
         )
 
     async def modify(self, instruction: str, context_chunks: List[Dict[str, Any]]) -> str:
+        """
+        Modify code, generate documentation, or provide suggestions
+        depending strictly on the user instruction.
+        """
         try:
             # Build context from chunks
             context_parts = []
             for chunk in context_chunks:
-                context_part = f"File: {chunk.get('file_path', 'Unknown')}"
-                if chunk.get('function_name'):
-                    context_part += f"\nFunction: {chunk['function_name']}"
-                if chunk.get('class_name'):
-                    context_part += f"\nClass: {chunk['class_name']}"
-                if chunk.get('docstring'):
-                    context_part += f"\nDocumentation: {chunk['docstring']}"
-                context_part += f"\nCode:\n{chunk.get('content', '')}"
-                context_parts.append(context_part)
+                part = "\n".join(filter(None, [
+                    f"File: {chunk.get('file_path', 'Unknown')}",
+                    f"Function: {chunk.get('function_name')}" if chunk.get("function_name") else None,
+                    f"Class: {chunk.get('class_name')}" if chunk.get("class_name") else None,
+                    f"Documentation: {chunk.get('docstring')}" if chunk.get("docstring") else None,
+                    f"Code:\n{chunk.get('content', '')}"
+                ]))
+                context_parts.append(part)
 
             context_text = "\n\n---\n\n".join(context_parts)
 
-            # System message
+            # System message with tightened role separation
             system_message = SystemMessage(content="""
 You are DevBuddy's Code Modifier Agent.
-Your role is to:
-1. Modify code based on user instructions
-2. Create README files and documentation
-3. Suggest improvements & refactoring
-4. Generate patches/snippets
-5. Follow code style and best practices
-                                           
- Your output should always be formatted using markdown to improve readability. Use code blocks for code snippets, headings for sections, and bolding or italics for emphasis.
 
+Your role depends strictly on the user instruction:
+- If the user asks for performance or improvement suggestions → provide only suggestions.
+- If the user asks for code modification or refactoring → provide only modified code.
+- If the user asks for documentation or README → provide only documentation.
+Do NOT mix tasks unless the user explicitly requests multiple outputs.
 
-When modifying code:
-- Preserve structure and intent
-- Add meaningful comments
-- Ensure functionality and readability
-- Follow Python best practices
-
-When creating README:
-- Include installation, usage, features, examples
-- Follow standard formatting
+General guidelines:
+- Always format responses in markdown for readability.
+- Use fenced code blocks for code.
+- Preserve structure, intent, and readability when modifying code.
+- Follow Python best practices.
+- When writing documentation, include clear headings and lists.
 """)
 
-            # Human message
+            # Human message with instruction + context
             human_message = HumanMessage(content=f"""Code Context:
 {context_text}
 
 User Instruction:
 {instruction}
 
-Provide the modified code, README, or documentation as per the instruction.
-Ensure completeness and clarity.
+Respond according to the rules above.
 """)
 
             logger.info(f"Sending modification request to Groq LLaMA 3 for: {instruction[:100]}...")
@@ -112,7 +108,7 @@ Include:
             return f"❌ Error generating README: {str(e)}"
 
     def _analyze_project(self, context_chunks: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Analyze project structure and features"""
+        """Analyze project structure and features from context chunks"""
         project_info = {
             "project_type": "Application",
             "features": [],

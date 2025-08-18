@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import axios from 'axios';
+import ReactMarkdown from 'react-markdown';
 
 import Header from '../components/Header';
 import Footer from '../components/Footer';
@@ -81,7 +82,8 @@ export default function Home() {
               {chatHistory.map((msg, idx) => (
                 <div key={idx} className={msg.role === 'user' ? 'text-right' : 'text-left'}>
                   <span className={msg.role === 'user' ? 'bg-sky-700 text-white px-3 py-1 rounded-lg inline-block' : 'bg-gray-600 text-white px-3 py-1 rounded-lg inline-block'}>
-                    <b>{msg.role === 'user' ? 'You' : 'DevBuddy'}:</b> {msg.content}
+                    <b>{msg.role === 'user' ? 'You' : 'DevBuddy'}:</b>
+                    <ReactMarkdown>{msg.content}</ReactMarkdown>
                   </span>
                 </div>
               ))}
