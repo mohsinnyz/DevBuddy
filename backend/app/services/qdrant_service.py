@@ -10,18 +10,12 @@ logger = logging.getLogger(__name__)
 
 class QdrantService:
     def __init__(self, collection_name: str = "code_chunks", vector_size: int = 768):
-        """
-        Initializes an asynchronous local Qdrant client and ensures the collection exists.
-        """
         local_qdrant_path = os.path.join(os.getcwd(), "local_qdrant_db")
         self.client = AsyncQdrantClient(path=local_qdrant_path)
         self.collection_name = collection_name
         self.vector_size = vector_size
 
     async def initialize(self):
-        """
-        Ensure collection exists (must be called after instantiation).
-        """
         try:
             await self.client.get_collection(self.collection_name)
         except Exception:
@@ -32,9 +26,6 @@ class QdrantService:
         logger.info("Qdrant service initialized and collection checked.")
 
     async def add_embeddings(self, ids: List[str], embeddings: List[List[float]], metadata: List[dict]):
-        """
-        Add a batch of embeddings asynchronously.
-        """
         points = [
             PointStruct(id=uid, vector=vector, payload=data)
             for uid, vector, data in zip(ids, embeddings, metadata)
@@ -45,9 +36,6 @@ class QdrantService:
         )
 
     async def store_chunks(self, embeddings: List[List[float]], metadata_list: List[dict]):
-        """
-        Store chunks asynchronously.
-        """
         points = [
             PointStruct(id=str(uuid.uuid4()), vector=embedding, payload=metadata)
             for embedding, metadata in zip(embeddings, metadata_list)
@@ -58,9 +46,6 @@ class QdrantService:
         )
 
     async def query_similar_chunks(self, query_vector: List[float], top_k: int = 5, query_filter: Filter = None):
-        """
-        Query for top_k most similar chunks asynchronously.
-        """
         results = await self.client.search(
             collection_name=self.collection_name,
             query_vector=query_vector,
@@ -70,9 +55,6 @@ class QdrantService:
         return results
 
     async def search_similar(self, query_vector: List[float], limit: int = 10, repo_url: Optional[str] = None) -> List[Dict[str, Any]]:
-        """
-        Perform a semantic similarity search.
-        """
         query_filter = None
         if repo_url:
             query_filter = Filter(
@@ -86,9 +68,6 @@ class QdrantService:
         ]
 
     async def search_by_keywords(self, keywords: List[str], limit: int = 5, repo_url: Optional[str] = None) -> List[Dict[str, Any]]:
-        """
-        Perform a keyword-based search using payload field matches.
-        """
         must_conditions = [
             FieldCondition(key="content", match=MatchValue(value=kw)) for kw in keywords
         ]
@@ -97,7 +76,6 @@ class QdrantService:
             
         query_filter = Filter(must=must_conditions)
 
-        # Using scroll to get all results matching the filter
         results, _ = await self.client.scroll(
             collection_name=self.collection_name,
             scroll_filter=query_filter,
@@ -110,11 +88,9 @@ class QdrantService:
         ]
 
     async def delete_all(self):
-        """
-        Deletes all points from the collection and recreates it asynchronously.
-        """
         await self.client.delete_collection(self.collection_name)
         await self.client.create_collection(
             collection_name=self.collection_name,
             vectors_config=VectorParams(size=self.vector_size, distance=Distance.COSINE),
         )
+

@@ -1,3 +1,4 @@
+#D:\DevBuddy\backend\app\agents\ingestion_agent.py
 import os
 from typing import List, Dict, Any
 from loguru import logger
@@ -24,7 +25,7 @@ class IngestionAgent:
         
         # 1. Clone repo
         repo_path = await self.git_utils.clone_repository(
-            str(repo_url),  # ensure it's a string
+            str(repo_url),
             branch=branch,
             force=True
         )
@@ -41,19 +42,21 @@ class IngestionAgent:
             code = self.git_utils.get_file_content(file_path)
             chunks = self.ast_chunker.chunk_code(file_path, code)
             for chunk in chunks:
-                chunk['repo_url'] = str(repo_url)  # store as string
+                chunk['repo_url'] = str(repo_url)
                 chunk['file_extension'] = '.py'
             all_chunks.extend(chunks)
 
         # 3. Generate embeddings
-        embeddings = self.embedding_service.embed_code_chunks(all_chunks)
+        embeddings = await self.embedding_service.embed_code_chunks(all_chunks)
 
-        # 4. Store in Qdrant
-        self.qdrant_service.store_chunks(embeddings, all_chunks)
+
+        # 4. Store in Qdrant (await async method)
+        await self.qdrant_service.store_chunks(embeddings, all_chunks)
+
 
         logger.info(f"Ingestion completed for {repo_url}")
         return {
-            "repo_url": str(repo_url),  # ✅ valid dict key-value
+            "repo_url": str(repo_url),
             "files_processed": len(py_files),
             "chunks_created": len(all_chunks)
         }
