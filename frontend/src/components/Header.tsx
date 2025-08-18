@@ -30,7 +30,7 @@ export default function Header() {
             </li>
             <li>
               <Link
-                href="https://linkedin.com/in/mohsinnyz"
+                href="https://www.linkedin.com/in/mohsinnyz/"
                 className="text-gray-300 hover:text-sky-500 font-medium transition-colors"
                 target="_blank"
                 rel="noopener noreferrer"
