@@ -1,5 +1,3 @@
-#D:\DevBuddy\backend\app\agents\modifier_agent.py
-
 # D:\DevBuddy\backend\app\agents\modifier_agent.py
 
 import os
@@ -48,6 +46,9 @@ Your role is to:
 3. Suggest improvements & refactoring
 4. Generate patches/snippets
 5. Follow code style and best practices
+                                           
+ Your output should always be formatted using markdown to improve readability. Use code blocks for code snippets, headings for sections, and bolding or italics for emphasis.
+
 
 When modifying code:
 - Preserve structure and intent

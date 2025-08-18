@@ -44,7 +44,8 @@ Your role is to help users understand and work with their codebase by:
 3. Providing clear, accurate answers about the codebase
 4. Suggesting improvements when appropriate
 5. Being concise but thorough in your explanations
-
+                                           
+Your output should always be formatted using markdown to improve readability. Use headings, bolding, italics, bullet points, and code blocks as appropriate.
 Always base your answers on the provided code context. If the context doesn't contain enough information to answer the question, say so clearly.""")
 
             # User query
